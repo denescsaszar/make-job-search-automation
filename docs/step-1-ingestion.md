@@ -2,95 +2,73 @@
 
 ## Scope
 
-Reliably collect job listings from search APIs and persist validated records to Notion.
+Reliably collect job listings from SerpAPI Google Jobs and persist full records to Notion, including complete job descriptions in the page body.
 
 ---
 
-## Make Scenario Flow
+## Make Scenario Flow (4 Modules)
 
 ```
-Scheduler (every 6h)
-  → HTTP Request (SerpAPI – Google Jobs)
-  → Iterator (1 job = 1 bundle)
-  → Filter (Posting URL starts with https://)
-  → Notion: Create Page
+HTTP [4] (Trigger, scheduled daily 09:05 Europe/Berlin)
+  → Iterator [8] (1 job = 1 bundle, 10 per page)
+  → Notion [10]: Create Database Item (metadata in properties)
+  → Notion [17]: Append Page Content (full description in page body)
 ```
+
+Scenario ID: **4388094** on eu1.make.com (org 988735)
 
 ---
 
 ## Fields Written
 
-| Notion Field | Source            | Type      | Required |
-|-------------|-------------------|-----------|----------|
-| Position    | `title`           | Title     | Yes      |
-| Company     | `company_name`    | Rich text | Yes      |
-| Place       | `location`        | Rich text | No       |
-| Posting URL | `related_links[0].link` | URL | Yes (filter gate) |
-| Status      | static `"Found"`  | Select    | Yes      |
-| Created At  | Notion auto       | Date      | Auto     |
+| Notion Property | Source              | Type      | Notes |
+|----------------|---------------------|-----------|-------|
+| Position       | `8.title`           | Title     | Job title from SerpAPI |
+| Company        | `8.company_name`    | Rich text | Employer name |
+| Place          | `8.location`        | Rich text | City/state |
+| Posting URL    | `8.share_link`      | URL       | Google Jobs share link |
+| Status         | `"To-do: Found"`    | Select    | Static value for all new jobs |
+| Contact        | (empty)             | Rich text | Reserved for manual entry |
+
+### Page Body (via Append Page Content)
+
+| Content        | Source              | Type      | Notes |
+|---------------|---------------------|-----------|-------|
+| Job Description | `8.description`   | Paragraph | Full text, no 2000-char limit |
+
+The two-step write pattern (Create + Append) is used because Notion rich text properties are limited to 2000 characters. Job descriptions from SerpAPI are often 3000-5000+ characters. Writing the description as page body content bypasses this limit entirely.
 
 ---
 
-## Validation Rules
+## SerpAPI Configuration
 
-1. **Posting URL must start with `https://`** — enforced by a Make filter before the Notion module.
-2. Jobs that fail the filter are silently dropped (no error, no partial write).
-3. No fallback URLs are written — a missing URL means the job is not persisted.
+| Parameter  | Value |
+|-----------|-------|
+| URL       | `https://serpapi.com/search.json` |
+| engine    | `google_jobs` |
+| q         | `Technical Product Manager` |
+| location  | `New York, NY, United States` |
+| gl        | `us` |
+| hl        | `en` |
+| api_key   | (stored in HTTP module) |
 
----
-
-## Deduplication by Posting URL
-
-### Problem
-
-The same job listing can appear in multiple SerpAPI responses across scheduled runs. Without deduplication, the Notion database accumulates duplicate rows.
-
-### Strategy
-
-Use **Posting URL** as the unique key. Before creating a Notion page, check if a page with the same Posting URL already exists.
-
-### Make Implementation
-
-```
-Iterator
-  → Filter (valid https:// URL)
-  → Notion: Search (filter: Posting URL = current URL)
-  → Router
-      ├─ Route 1: Result count = 0 → Notion: Create Page (new job)
-      └─ Route 2: Result count > 0 → No action (skip duplicate)
-```
-
-### Module Config
-
-**Notion Search module:**
-- Database: Job Listings
-- Filter property: `Posting URL`
-- Filter condition: `equals`
-- Filter value: `{{current_job.posting_url}}`
-
-**Router conditions:**
-- Route 1 (Create): `{{length(search_results)}} = 0`
-- Route 2 (Skip): `{{length(search_results)}} > 0`
-
-### Why URL-only (not title + company)?
-
-- URLs are globally unique identifiers for a posting.
-- Title + company matching is fuzzy and risks false positives (same company, similar roles).
-- URL dedup is deterministic, zero false positives.
-- If needed later, a secondary title+company heuristic can be layered on top.
-
-### Edge Cases
-
-| Scenario | Handling |
-|----------|----------|
-| Same job, different URL (aggregator redirect) | Treated as separate — acceptable for now |
-| URL changes after repost | Treated as new job — correct behavior |
-| Notion Search API latency | Make retries automatically; see Failure & Retry Strategy |
+Returns 10 results per page. See [pagination.md](pagination.md) for multi-page fetching.
 
 ---
 
-## Status After Step 1
+## Key Design Decisions
 
-- Ingestion pipeline: **stable**
-- Deduplication: **active (URL-based)**
-- Data quality: **validated before write**
+- **share_link** used as Posting URL (not `related_links`) — more reliable, always present
+- **Append Page Content** for descriptions — bypasses 2000-char rich text limit
+- **Iterator Array** must use a data-picker pill (`4.data.jobs_results[]`), not literal text
+- **No URL filter currently active** — share_link is always a valid Google URL
+- **No deduplication yet** — planned for Step 2, critical before enabling daily schedule
+
+---
+
+## Status
+
+- Ingestion pipeline: **working** (10 jobs per run)
+- Job descriptions: **full text in page body**
+- Pagination: **not yet implemented** (Step 1.5)
+- Deduplication: **not yet implemented** (Step 2)
