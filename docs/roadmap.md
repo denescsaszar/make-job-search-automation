@@ -11,9 +11,13 @@
 
 ## Step 1.5 — Pagination (IN PROGRESS)
 
-- [ ] Rebuild scenario with Repeater → HTTP → Iterator → Notion → Set Variable loop
-- [ ] Use SerpAPI `next_page_token` for token-based pagination (10 jobs/page)
+- [x] Create v2 scenario (4426581) with Repeater → HTTP → Iterator → Notion chain
+- [x] Add Set Variable module to store `next_page_token` after each page
+- [x] Configure SerpAPI params: `Berlin, Germany`, `gl=de`, `hl=en`
+- [x] Disable broken built-in HTTP v4 pagination (known Make.com bug with items path)
+- [ ] Fix token omission: `next_page_token` must not be sent on first request (SerpAPI rejects empty tokens)
 - [ ] Add stop filter to prevent wasted API credits on last page
+- [ ] End-to-end paginated run (30+ jobs across 3 pages)
 - [ ] Documentation: [pagination.md](pagination.md)
 
 ## Step 2 — Deduplication & Multi-Query

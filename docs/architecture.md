@@ -21,9 +21,7 @@ normalizes it, and stores it in a shared Notion database for downstream agents
 │ Job Source Ingest  │
 │ (HTTP / Search API)│
 │  - Google Jobs     │
-│  - LinkedIn        │
-│  - Indeed          │
-│  - jobs.ch         │
+│         │
 └──────┬─────────────┘
        │
        ▼
@@ -109,12 +107,12 @@ Decision / Action Agents (future)
 
 ## 📚 Detailed Documentation
 
-| Document | Purpose |
-|----------|---------|
-| [Step 1: Ingestion](step-1-ingestion.md) | Ingestion pipeline + deduplication by Posting URL |
-| [Data Model](data-model.md) | Field-level data flow diagram, ownership rules |
-| [Multi-Query Ingestion](multi-query-ingestion.md) | Running multiple search queries per execution |
-| [Fit Score Logic](fit-score-logic.md) | Rule-based 0–100 scoring against target profile |
-| [Make Scenario Mapping](make-scenario-mapping.md) | Module-by-module Make scenario reference |
-| [Failure & Retry Strategy](failure-retry-strategy.md) | Error handling, retries, rate limits, alerting |
-| [Roadmap](roadmap.md) | Step-by-step implementation plan |
+| Document                                              | Purpose                                           |
+| ----------------------------------------------------- | ------------------------------------------------- |
+| [Step 1: Ingestion](step-1-ingestion.md)              | Ingestion pipeline + deduplication by Posting URL |
+| [Data Model](data-model.md)                           | Field-level data flow diagram, ownership rules    |
+| [Multi-Query Ingestion](multi-query-ingestion.md)     | Running multiple search queries per execution     |
+| [Fit Score Logic](fit-score-logic.md)                 | Rule-based 0–100 scoring against target profile   |
+| [Make Scenario Mapping](make-scenario-mapping.md)     | Module-by-module Make scenario reference          |
+| [Failure & Retry Strategy](failure-retry-strategy.md) | Error handling, retries, rate limits, alerting    |
+| [Roadmap](roadmap.md)                                 | Step-by-step implementation plan                  |

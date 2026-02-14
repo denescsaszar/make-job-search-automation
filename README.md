@@ -23,6 +23,7 @@ The focus is **workflow design, data integrity, and scalability** — not scrapi
 
 ## High-Level Architecture
 
+### v1 — Single-page ingestion (Scenario 4388094, stable)
 ```
 Scheduled Trigger (Make, daily 09:05)
   → HTTP Module (SerpAPI – Google Jobs)
@@ -31,9 +32,23 @@ Scheduled Trigger (Make, daily 09:05)
         → Notion: Append Page Content (full job description as paragraph)
 ```
 
+### v2 — Paginated ingestion (Scenario 4426581, in progress)
+```
+Scheduled Trigger
+  → Repeater (N pages)
+    → HTTP Module (SerpAPI + next_page_token via get())
+      → Iterator (10 jobs per page)
+        → Notion: Search Objects (dedup check)
+          → Notion: Create Database Item
+            → Notion: Append Page Content
+    → Set Variable (store next_page_token for next iteration)
+```
+
 ---
 
-## Make Scenario — 4 Modules
+## Make Scenarios
+
+### v1 — Single Page (Scenario 4388094, stable)
 
 | # | Module | Type | Purpose |
 |---|--------|------|---------|
@@ -42,17 +57,30 @@ Scheduled Trigger (Make, daily 09:05)
 | 10 | Notion – Create Database Item | Notion (Legacy) | Creates a row with metadata fields |
 | 17 | Notion – Append Page Content | Notion | Writes full job description into the page body |
 
+### v2 — Paginated (Scenario 4426581, in progress)
+
+| # | Module | Type | Purpose |
+|---|--------|------|---------|
+| 1 | Repeater | Flow Control | Loop N times (one per page) |
+| 2 | HTTP – Make a request | SerpAPI call | Fetches 10 jobs + next_page_token |
+| 3 | Iterator | Flow Control | Splits `jobs_results[]` into bundles |
+| 4 | Notion – Search Objects | Notion | Dedup check by share_link |
+| 5 | Notion – Create Database Item | Notion (Legacy) | Creates row with metadata |
+| 6 | Notion – Append Page Content | Notion | Full description in page body |
+| 7 | Tools – Set Variable | Tools | Stores `next_page_token` for next iteration |
+
 ### SerpAPI Query Parameters
 
 | Parameter | Value |
 |-----------|-------|
 | engine | `google_jobs` |
-| q | `Technical Product Manager` |
-| location | `New York, NY, United States` |
-| gl | `us` |
+| q | `Technical Project Manager` |
+| location | `Berlin, Germany` |
+| gl | `de` |
 | hl | `en` |
+| api_key | (stored in module) |
 
-Returns 10 results per call. Pagination available via `start` parameter (e.g., `start=10` for next page).
+Returns 10 results per call. Pagination uses `next_page_token` from `serpapi_pagination` object (the `start` offset param is deprecated for Google Jobs).
 
 ---
 
@@ -94,14 +122,16 @@ The Append module receives the `Database Item ID` from Module 10 and writes the 
 ## Current Status
 
 - [x] Repository initialized
-- [x] Make scenario created (4 modules)
+- [x] v1 scenario created (4 modules, single page)
 - [x] HTTP ingestion via SerpAPI working
 - [x] Iterator correctly splitting 10 bundles
-- [x] Notion Create Database Item with all metadata fields
-- [x] Notion Append Page Content with full job description
+- [x] Notion Create + Append Page Content with full descriptions
 - [x] End-to-end run: 10 jobs ingested with descriptions
+- [x] v2 scenario created with Repeater + Set Variable pagination loop
+- [ ] Fix `next_page_token` conditional omission on first iteration
+- [ ] End-to-end paginated run (30+ jobs)
 
-**Step 1 is complete and stable.**
+**Step 1 complete. Step 1.5 (pagination) in progress.**
 
 ---
 

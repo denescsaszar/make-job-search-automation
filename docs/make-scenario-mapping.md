@@ -2,7 +2,11 @@
 
 ## Overview
 
-Maps the **Make.com scenario modules** to their purpose, configuration, and connections. This reflects the **currently deployed** scenario (ID: 4388094).
+Maps the **Make.com scenario modules** to their purpose, configuration, and connections.
+
+Two scenarios exist:
+- **v1** (ID: 4388094) — Single-page ingestion, stable and working
+- **v2** (ID: 4426581) — Paginated ingestion with Repeater loop, in progress
 
 ---
 
@@ -99,14 +103,82 @@ Maps the **Make.com scenario modules** to their purpose, configuration, and conn
 
 ---
 
-## Planned Changes
+---
 
-### Step 1.5 — Pagination
-Restructure to: Repeater → HTTP → Iterator → Notion Create → Notion Append → Set Variable.
-See [pagination.md](pagination.md) for full plan.
+## v2 Module Map (Scenario 4426581, in progress)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ MODULE 1: Repeater                                        [TRIGGER] │
+│ Type: Flow Control > Repeater                                       │
+│ Repeats: 3 (= 3 pages = 30 jobs max)                               │
+└──────────┬──────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ MODULE 2: HTTP Request — SerpAPI                                    │
+│ Type: HTTP > Make a request                                         │
+│ Method: GET                                                         │
+│ URL: https://serpapi.com/search.json                                │
+│ Query params:                                                       │
+│   engine = google_jobs                                              │
+│   q = Technical Project Manager                                     │
+│   location = Berlin, Germany                                        │
+│   gl = de                                                           │
+│   hl = en                                                           │
+│   api_key = (stored in module)                                      │
+│   next_page_token = get("next_page_token") [NEEDS FIX: omit when   │
+│                     empty — SerpAPI rejects invalid tokens]          │
+└──────────┬──────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ MODULE 3: Iterator — Jobs                                           │
+│ Type: Flow Control > Iterator                                       │
+│ Array: {{2.data.jobs_results}}                                      │
+└──────────┬──────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ MODULE 4: Notion — Search Objects                                   │
+│ Type: Notion > Search Objects                                       │
+│ Purpose: Dedup check — search for existing share_link               │
+└──────────┬──────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ MODULE 5: Notion — Create Database Item (Legacy)                    │
+│ Type: Notion > Create a Database Item (Legacy)                      │
+│ Connection: "Notion – Jobs Master (Shared DB)"                      │
+│ Properties: Position, Company, Place, Posting URL, Status           │
+└──────────┬──────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ MODULE 6: Notion — Append Page Content                              │
+│ Type: Notion > Append a Page Content                                │
+│ Content: {{3.description}} as paragraph block                       │
+└──────────┬──────────────────────────────────────────────────────────┘
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ MODULE 7: Tools — Set Variable                                      │
+│ Type: Tools > Set variable                                          │
+│ Variable name: next_page_token                                      │
+│ Value: {{2.data.serpapi_pagination.next_page_token}}                 │
+│ Purpose: Store token for next Repeater iteration                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Remaining Work
+
+### Pagination token fix
+The `next_page_token` param must be omitted on the first request. See [pagination.md](pagination.md).
 
 ### Step 2 — Deduplication
-Add Notion Search before Create to check if share_link already exists. Use Router to skip duplicates.
+Notion Search (Module 4) needs a filter/router to skip Create when share_link already exists.
 
-### Step 2 — Multi-Query
+### Step 3 — Multi-Query
 Add Set Variable (query list) + outer Iterator to loop through multiple search terms and locations.
